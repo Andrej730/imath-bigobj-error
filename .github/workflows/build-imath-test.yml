@@ -1,0 +1,44 @@
+name: build-imath-test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-imath-test:
+    runs-on: windows-2022
+
+    steps:
+    - name: Configure build
+      run: |
+        Set-PSDebug -Trace 1
+        $ErrorActionPreference = "Stop"
+
+        curl -L https://raw.githubusercontent.com/Andrej730/vcvarsall-pwsh/refs/heads/master/generate-vcvarsall-env.ps1 -o generate-vcvarsall-env.ps1
+        pwsh -NoProfile -File .\generate-vcvarsall-env.ps1
+        . .\vcvarsall-env.ps1
+
+        curl -L "https://github.com/boostorg/boost/releases/download/boost-1.86.0/boost-1.86.0-b2-nodocs.zip" -o boost-1.86.0-b2-nodocs.zip
+        7z x boost-1.86.0-b2-nodocs.zip
+
+        cd boost-1.86.0
+        .\bootstrap.bat
+        .\b2 --with-python variant=release address-model=64 link=shared
+        $BOOST_FOLDER = "$PWD\stage"
+        cd stage
+        tree /F
+        cd ..
+
+        cd ..
+        git clone https://github.com/AcademySoftwareFoundation/Imath.git
+        cd Imath
+        mkdir build && cd build
+        echo $BOOST_FOLDER
+        cmake .. `
+          -G Ninja `
+          -DBUILD_SHARED_LIBS=ON `
+          -DBUILD_TESTING=OFF `
+          -DPYTHON=ON `
+          -DCMAKE_PREFIX_PATH="$BOOST_FOLDER" `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DPython3_FIND_STRATEGY=LOCATION
+        ninja -v
